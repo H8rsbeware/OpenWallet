@@ -1,0 +1,1 @@
+[2022|function getMonth() { [native code] }|function getDay() { [native code] }] @ 13:function getMinutes() { [native code] }:function getSeconds() { [native code] } - TypeError: Cannot read properties of undefined (reading 'indexOf')

@@ -31,14 +31,15 @@ const logo = '\
 
 //START
 async function start(){
+    console.clear();
     //Shameless marketing.
-    console.log(logo)
+    console.log(`\n${logo}`);
     //Tries to check if a file created but empty
     let flag = false;
     fs.readFile(filePath, function (err, data){
         try{
             console.log(data.indexOf("[START]"))
-            if (data.indexOf("[START]") >=1){
+            if (data.indexOf("[START]") == 0){
                 flag = true;
             }
         //Non-fatal error catch
@@ -54,7 +55,7 @@ async function start(){
         //Every .3 seconds the animation cycles through a phase at a low frame rate, pausing at the end and presenting the future full UI.
         await sleep(300).then(() =>{
             console.clear();
-            console.log(`${startAnimation[i]}\n${logo}\n${startAnimation[i]}`);
+            console.log(`${startAnimation[i+1]}\n\n${logo}\n${startAnimation[i]+1}`);
             i++;
         })
     }
@@ -99,19 +100,22 @@ async function createFile(){
                 id = prompt("Coin : ");
             }
         }
+        id = coinParser(id);
         fs.appendFileSync(filePath,`ID = ${id}\n`);
 
     //Wallet set up, multi-wallets will be possible in the future using '[BREAK]' tags as spliting points.  
     //Checks will occur using nanopools account search in the future, it will only be flagged appropriately but not loop the set-up
     let wallet = prompt("Wallet : ");
-    let check = await walletCheck(id.toLowerCase(),wallet);
+    let check = await walletCheck(id,wallet);
     
-    while(check == 1){
+    while(check == 'fail'){
+        
         console.log(`${wallet} does not exist.`.bgYellow.white);
         sleep(500);
         process.stdout.clearLine();
         process.stdout.cursorTo(0);
         wallet = prompt("Wallet : ");
+        check = await walletCheck(id,wallet);
 
     }
     
@@ -128,9 +132,7 @@ async function createFile(){
 
 //Not yet worked on, will be a simple pop up ui, allowing access to wallet balances, profile loader and editor, quick start for new miners, help menus and guides. 
 function login(){
-    const http = require('http');
-    const port = parseInt(`${2000}`, 10)||5555; //ADD CONFIG PARSING CODE
-    //const name = 
+    configParser(filePath);
 }
 
 //!UTIL
@@ -146,22 +148,57 @@ function errorCall(ptErr){
     console.log("Non-fatal error occurred, Check log file to see the console message.".bgYellow.white);
 }
 async function walletCheck(curr, address){
-    let wallet = `https://api.nanopool.org/v1/${(curr)}/balance/${address}`;
+    try{
+        let wallet = `https://api.nanopool.org/v1/${(curr)}/balance/${address}`
+
+        let walletResponse = await fetch(wallet);
+        let json = await walletResponse.json();
     
-    let walletResponse = await fetch(wallet);
-    
-    let json = await walletResponse.json();
-    if(json.status != false){
-        return `${json.data}${curr}`;
-    }else{
-        return 1;
+        if(json.status != false){
+            return `${json.data}${curr}`;
+        }else{
+            return 'fail';
+        }   
+    }catch(err){
+        return 'fail';
     }
-    
+ 
+}
+async function currentHash(curr, address){
+    let flag = 0
+    while(flag != 2){
+        try{
+            let hash = `https://api.nanopool.org/v1/${curr}/hashrate/${address}`;
+            let hashResponse = await fetch(hash);
+            let json = await hashResponse.json();
 
+            if(json.status != false){
+                return(`${curr} : ${json.data}Mh/s`)
+            }else{
+                return(`Not Avaliable`.bgYellow.white);
+            }
+        }catch(err){
+            return 'fail'; 
+        }
+    }
+}
 
+function configParser(file){
+    fs.readFile(file, 'utf-8', (err, data) =>{
+        if(err){
+            errorCall(err);
+        }
+        let 
+    })
     
 }
 
+function coinParser(coin){
+    if (coin == "ERG" || coin == "erg"){
+        return coin = "ergo";
+    }
+    return coin.toLowerCase();
+}
 //start on launch. 
 start();
 
