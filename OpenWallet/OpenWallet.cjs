@@ -9,14 +9,15 @@
 const fs = require("fs");
 const colors = require('colors');
 const fetch = require('node-fetch');
-const process = require('process')
+const readline = require('readline');
+const process = require('process');
 let filePath = "./usersettings.config";
 let log = "./log.txt";
 const prompt = require('prompt-sync')();
 const mainCoin = ["eth", "etc", "zec", "xmr", "rvn", "cfx", "erg", "ETH", "ETC", "ZEC", "XMR", "RVN", "CFX", "ERG"]
 
 //Strings I should move to a different file
-const startAnimation = ["","----                                                                               ----","--------------                                                            --------------","------------------------                                        ------------------------","----------------------------------                    ----------------------------------","----------------------------------------------------------------------------------------\n"];
+const startAnimation = ["","----                                                                               ----","--------------                                                            --------------","------------------------                                        ------------------------","----------------------------------                    ----------------------------------","----------------------------------------------------------------------------------------"];
 const logo = '\
  #####                              ##   ##            ###      ###                ##   \n\
 ##   ##                             ##   ##             ##       ##                ##   \n\
@@ -33,7 +34,7 @@ const logo = '\
 async function start(){
     console.clear();
     //Shameless marketing.
-    console.log(`\n${logo}`);
+    console.log(`\n\n${logo}`);
     //Tries to check if a file created but empty
     let flag = false;
     fs.readFile(filePath, function (err, data){
@@ -50,18 +51,7 @@ async function start(){
     });
 
     //Cute little animation, nothing fancy, but its a CUI, a little painful code hasnt hurt anyone... sleep is very professional.
-    let i = 0;
-    while(i<startAnimation.length){
-        //Every .3 seconds the animation cycles through a phase at a low frame rate, pausing at the end and presenting the future full UI.
-        await sleep(300).then(() =>{
-            console.clear();
-            console.log(`${startAnimation[i+1]}\n\n${logo}\n${startAnimation[i]+1}`);
-            i++;
-        })
-    }
-    sleep(500);
-    console.clear()
-    console.log(`${startAnimation[startAnimation.length-1]}\n${logo}\n${startAnimation[startAnimation.length-1]}`);
+    await anim();
 
     //Flag is from the file empty checks
     if(fs.existsSync(filePath) && flag == true){
@@ -126,13 +116,49 @@ async function createFile(){
     let rig = prompt("Rig name : ");
     fs.appendFileSync(filePath, `RIG = ${rig}\n`);
 
+    let algorithm;
+    let lwID = id.toLowerCase()
+    switch(lwID){
+        case "eth":
+            algorithm = "Ethash"
+            break;
+        case "etc":
+            algorithm = "Etchash"
+            break;
+        case "ergo":
+            algorithm = "autolykos"
+            break;
+        case "zec":
+            algorithm = "Equihash"
+            break;
+        case "cfx":
+            algorithm = "Octopus"
+            break;
+        case "rvn":
+            algorithm = "KAWPOW"
+            break;
+        case "xmr":
+            algorithm = "RandomX"
+            break; 
+        default:
+            algorithm = "Unknown"
+            
+    }
+    fs.appendFileSync(filePath, `ALGORITHM = ${algorithm}\n[END]`);
+    
+
+    console.log(`Algorithm : ${algorithm}`)
+    sleep(600);
     
     
 }
 
 //Not yet worked on, will be a simple pop up ui, allowing access to wallet balances, profile loader and editor, quick start for new miners, help menus and guides. 
-function login(){
-    configParser(filePath);
+async function login(){
+    let parsedJson = await configParser(filePath);
+    screenReset(`${startAnimation[startAnimation.length-1]}\n\n${logo}\n${startAnimation[startAnimation.length-1]}`);
+    console.log(parsedJson);
+    //for(let i = 0; i <= returnVal[0].length() + 1; i++)
 }
 
 //!UTIL
@@ -164,10 +190,12 @@ async function walletCheck(curr, address){
     }
  
 }
+//Current Hash checks the current reported hashrate
 async function currentHash(curr, address){
     let flag = 0
     while(flag != 2){
         try{
+            //Parses url, and checks the wallets status to decide if avaliable to read.
             let hash = `https://api.nanopool.org/v1/${curr}/hashrate/${address}`;
             let hashResponse = await fetch(hash);
             let json = await hashResponse.json();
@@ -175,7 +203,7 @@ async function currentHash(curr, address){
             if(json.status != false){
                 return(`${curr} : ${json.data}Mh/s`)
             }else{
-                return(`Not Avaliable`.bgYellow.white);
+                return(`| Current hashrate not avaliable |`.bgYellow.white);
             }
         }catch(err){
             return 'fail'; 
@@ -183,12 +211,70 @@ async function currentHash(curr, address){
     }
 }
 
-function configParser(file){
+// Average hash checks the average reported hashrate over 1,6, and 24hrs
+async function averageHashParser(curr, address){
+    let flag = 0
+    while(flag != 2){
+        try{
+            //Same as currentHash()
+            let hash = `https://api.nanopool.org/v1/${curr}/avghashrate/${address}`;
+            let hashResponse = await fetch(hash);
+            let json = await hashResponse.json();
+
+            if(json.status != false){
+                return(`| 1hr ${json.data.h1} | 6hr ${json.data.h6} | 24hr ${json.data.h24} |`)
+            }else{
+                return(` | Average hashrate not avaliable |`.bgYellow.white);
+            }
+        }catch(err){
+            return 'fail'; 
+        }
+    }
+}
+
+async function configParser(file){
     fs.readFile(file, 'utf-8', (err, data) =>{
         if(err){
             errorCall(err);
         }
-        let 
+        
+        const fileStream = fs.createReadStream(filePath);
+        const rl = readline.createInterface({
+            input: fileStream,
+            crlfDelay: Infinity
+        });
+        
+        
+        let portTemp = [], walletTemp = [], idTemp = [], rigTemp = [], algTemp = [];
+        rl.on('line', (line) =>{
+            let value = line.split(" = ")[1];
+            let tag = line.split(" = ")[0];
+            
+            switch(tag){
+                case "PORT" :
+                    portTemp.push(value) 
+                    break;
+                case "ID" :
+                    idTemp.push(value)
+                    break;
+                case "RIG" :
+                    rigTemp.push(value)
+                    break;
+                case "ALGORITHM" :
+                    algTemp.push(value)
+                    break;
+                case "WALLET" :
+                    walletTemp.push(value)
+                    break;
+                default:
+                    break;
+            }
+            if (tag == "[END]"){
+                return JSON.stringify([portTemp, idTemp, walletTemp, rigTemp, algTemp]); 
+            }           
+        })
+            
+        
     })
     
 }
@@ -199,6 +285,29 @@ function coinParser(coin){
     }
     return coin.toLowerCase();
 }
+
+//Animation
+async function anim(){
+    let i = 1;
+    console.clear();
+    while(i<startAnimation.length){
+        //Every .3 seconds the animation cycles through a phase at a low frame rate, pausing at the end and presenting the future full UI.
+        await sleep(250).then(() =>{
+            screenReset(`${startAnimation[i]}\n\n${logo}\n${startAnimation[i]}`);
+            i++;
+        })
+    }
+    sleep(500);
+    console.clear()
+    console.log(`${startAnimation[startAnimation.length-1]}\n\n${logo}\n${startAnimation[startAnimation.length-1]}`);
+}
+
+function screenReset(data){
+    console.clear();
+    sleep(30);
+    console.log(data)
+}
+
 //start on launch. 
 start();
 
