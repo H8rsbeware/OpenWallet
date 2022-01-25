@@ -8,9 +8,12 @@
 //PREREQUESITES
 const fs = require("fs");
 const colors = require('colors');
+const fetch = require('node-fetch');
+const process = require('process')
 let filePath = "./usersettings.config";
 let log = "./log.txt";
 const prompt = require('prompt-sync')();
+const mainCoin = ["eth", "etc", "zec", "xmr", "rvn", "cfx", "erg", "ETH", "ETC", "ZEC", "XMR", "RVN", "CFX", "ERG"]
 
 //Strings I should move to a different file
 const startAnimation = ["","----                                                                               ----","--------------                                                            --------------","------------------------                                        ------------------------","----------------------------------                    ----------------------------------","----------------------------------------------------------------------------------------\n"];
@@ -55,6 +58,10 @@ async function start(){
             i++;
         })
     }
+    sleep(500);
+    console.clear()
+    console.log(`${startAnimation[startAnimation.length-1]}\n${logo}\n${startAnimation[startAnimation.length-1]}`);
+
     //Flag is from the file empty checks
     if(fs.existsSync(filePath) && flag == true){
         login();
@@ -66,40 +73,56 @@ async function start(){
 }   
 
 //File management
-function createFile(){
+async function createFile(){
 
     //Initial line write for search purposes
-    fs.writeFileSync(filePath, "[START]");
+    fs.writeFileSync(filePath, "[START]\n");
     
     //Port set up, just so people can configure around other apps
     let port = prompt("Port : ");
     port > 9999? port == 9999 : port == port;
     fs.appendFileSync(filePath, `PORT = ${port}\n`);
     
+        //Coin shorthand... im new to this.
+        let id;
+        let correct = 0;
+        id = prompt("Coin : ");
+        //If its not correct, it will reloop, removing the line to avoid clutter 
+        while(correct != 2){
+            if(mainCoin.indexOf(id)>-1){
+                correct = 2;
+            }else{
+                correct = 1;
+                console.log(`${id} does not exist.`.bgYellow.white);
+                sleep(500);
+                if(correct != 0){process.stdout.clearLine(), process.stdout.cursorTo(0)};
+                id = prompt("Coin : ");
+            }
+        }
+        fs.appendFileSync(filePath,`ID = ${id}\n`);
+
     //Wallet set up, multi-wallets will be possible in the future using '[BREAK]' tags as spliting points.  
     //Checks will occur using nanopools account search in the future, it will only be flagged appropriately but not loop the set-up
     let wallet = prompt("Wallet : ");
-    fs.appendFileSync(filePath,`WALLET = ${wallet}\n`);
+    let check = await walletCheck(id.toLowerCase(),wallet);
+    
+    while(check == 1){
+        console.log(`${wallet} does not exist.`.bgYellow.white);
+        sleep(500);
+        process.stdout.clearLine();
+        process.stdout.cursorTo(0);
+        wallet = prompt("Wallet : ");
 
-    //Coin shorthand... im new to this.
-    let id;
-    let correct = false;
-    //If its not correct, it will reloop, removing the line to avoid clutter 
-    while(!correct){
-        process.stdout("\r\x1b[K");
-        id = prompt("Coin : ");
-        if(id.length > 4){
-            correct = false;
-        }else{
-            correct = true;
-            break;
-        }
     }
-    fs.appendFileSync(filePath,`ID = ${id}\n`);
+    
+      
+    fs.appendFileSync(filePath,`WALLET = ${wallet}\n`);
 
     //Rig name set up, Misleading really as they will be used to identify profiles as well.
     let rig = prompt("Rig name : ");
     fs.appendFileSync(filePath, `RIG = ${rig}\n`);
+
+    
     
 }
 
@@ -122,6 +145,23 @@ function errorCall(ptErr){
     fs.appendFileSync(log, `${date} - ${ptErr}`);
     console.log("Non-fatal error occurred, Check log file to see the console message.".bgYellow.white);
 }
+async function walletCheck(curr, address){
+    let wallet = `https://api.nanopool.org/v1/${(curr)}/balance/${address}`;
+    
+    let walletResponse = await fetch(wallet);
+    
+    let json = await walletResponse.json();
+    if(json.status != false){
+        return `${json.data}${curr}`;
+    }else{
+        return 1;
+    }
+    
+
+
+    
+}
 
 //start on launch. 
 start();
+
